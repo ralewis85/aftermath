@@ -13,5 +13,7 @@ struct aftermathApp: App {
         WindowGroup {
             ContentView()
         }
+        .windowResizability(.contentSize)
+        .defaultSize(width: 800, height: 600)
     }
 }
