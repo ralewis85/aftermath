@@ -1,8 +1,8 @@
-# Aftermath
-
 <p align="center">
   <img src=".github/images/screenshot.png" width="800" alt="Aftermath App Screenshot">
 </p>
+
+# Aftermath
 
 A minimal 4:3 aspect ratio visionOS streaming app for Apple Vision Pro. Designed with Toonami Aftermath in mind, but works with any HLS streaming source.
 
