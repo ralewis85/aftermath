@@ -11,7 +11,6 @@ A minimal 4:3 aspect ratio visionOS streaming app for Apple Vision Pro. Designed
 ## Features
 
 - **Dual Channel Support** - Switch between two configurable streaming channels (EST/PST)
-- **Configurable URLs** - Set your own HLS stream URLs through an intuitive settings interface
 - **Persistent Configuration** - Your stream URLs are automatically saved and restored
 - **4:3 Aspect Ratio** - Window perfectly hugs the video content with no wasted space
 - **Ornament Controls** - Channel switcher and settings float outside the video window
@@ -23,7 +22,7 @@ A minimal 4:3 aspect ratio visionOS streaming app for Apple Vision Pro. Designed
 On first launch, the app starts with empty stream URLs. You'll need to configure them:
 
 1. Tap the **settings icon (⚙️)** in the ornament above the video
-2. Enter your HLS stream URLs for EST and PST channels
+2. Enter your HLS / m3u8 stream URLs for EST and PST channels
 3. Tap **"Done"** to save
 4. Select a channel (EST or PST) to start streaming
 
