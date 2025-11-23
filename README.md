@@ -58,6 +58,10 @@ open aftermath.xcodeproj
 
 4. Build and run (⌘R)
 
+## Support
+
+If you're interested in more projects like this, consider [leaving a tip](https://ko-fi.com/neovisiondev) ☕
+
 ## License
 
 Distributed under the MIT license.
