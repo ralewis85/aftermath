@@ -1,6 +1,8 @@
 # Aftermath
 
-A minimal visionOS streaming application for Apple Vision Pro with configurable dual-channel support.  This app was designed with the popular streaming site Toonami Aftermath in mind.  Finding the m3u8 streams to populate inside of the app is an exercise left up to the user.
+A minimal 4:3 aspect ratio visionOS streaming app for Apple Vision Pro. Designed with Toonami Aftermath in mind, but works with any HLS streaming source.
+
+**Note:** This app does not provide stream URLs. Users must find and supply their own m3u8 links.
 
 ## Features
 
