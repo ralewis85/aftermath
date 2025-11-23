@@ -256,24 +256,17 @@ struct SettingsView: View {
         NavigationStack {
             Form {
                 Section("EST Channel URL") {
-                    TextField("http://api.toonamiaftermath.com:3000/est/playlist.m3u8", text: $estURL)
+                    TextField("https://example.com/stream.m3u8", text: $estURL)
                         .textFieldStyle(.roundedBorder)
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
                 }
 
                 Section("PST Channel URL") {
-                    TextField("http://api.toonamiaftermath.com:3000/pst/playlist.m3u8", text: $pstURL)
+                    TextField("https://example.com/stream.m3u8", text: $pstURL)
                         .textFieldStyle(.roundedBorder)
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
-                }
-
-                Section {
-                    Button("Use Toonami Aftermath URLs") {
-                        estURL = "http://api.toonamiaftermath.com:3000/est/playlist.m3u8"
-                        pstURL = "http://api.toonamiaftermath.com:3000/pst/playlist.m3u8"
-                    }
                 }
             }
             .navigationTitle("Stream Settings")
