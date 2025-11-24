@@ -30,6 +30,11 @@ struct ContentView: View {
     @State private var showSettings: Bool = false
     @State private var showURLAlert: Bool = false
     @State private var alertMessage: String = ""
+    @State private var volume: Double = 1.0
+    @State private var previousVolume: Double = 1.0
+    @State private var showOrnaments: Bool = true
+    @State private var ornamentHideTask: Task<Void, Never>?
+    @State private var isInteractingWithOrnaments: Bool = false
 
     @AppStorage("estURL") private var estURL: String = ""
     @AppStorage("pstURL") private var pstURL: String = ""
@@ -49,7 +54,13 @@ struct ContentView: View {
                 .aspectRatio(4.0/3.0, contentMode: .fit)
                 .ignoresSafeArea()
 
-            Button(action: togglePlayPause) {
+            Button(action: {
+                if showOrnaments {
+                    togglePlayPause()
+                } else {
+                    showOrnamentsTemporarily()
+                }
+            }) {
                 Color.clear
                     .contentShape(Rectangle())
             }
@@ -75,6 +86,34 @@ struct ContentView: View {
             contentAlignment: .bottom
         ) {
             HStack(spacing: 12) {
+                HStack(spacing: 12) {
+                    Button(action: toggleMute) {
+                        Image(systemName: volume > 0 ? "speaker.wave.2.fill" : "speaker.slash.fill")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.8))
+                            .frame(width: 24, height: 24)
+                    }
+                    .buttonStyle(.borderless)
+                    .frame(width: 40, height: 40)
+
+                    Slider(value: $volume, in: 0...1)
+                        .frame(width: 180)
+                        .onChange(of: volume) { oldValue, newValue in
+                            if newValue > 0 {
+                                previousVolume = newValue
+                            }
+                            player.volume = Float(newValue)
+                        }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(Color.gray.opacity(0.3))
+                )
+
+                Spacer(minLength: 200)
+
                 ForEach(Channel.allCases, id: \.self) { channel in
                     Button(action: {
                         selectedChannel = channel
@@ -113,7 +152,21 @@ struct ContentView: View {
                 }
                 .buttonStyle(.plain)
             }
+            .frame(maxWidth: .infinity)
             .padding(16)
+            .opacity(showOrnaments ? 1 : 0)
+            .animation(.easeInOut(duration: 0.3), value: showOrnaments)
+            .onContinuousHover { phase in
+                switch phase {
+                case .active:
+                    keepOrnamentsVisible()
+                case .ended:
+                    releaseOrnamentInteraction()
+                }
+            }
+            .onAppear {
+                scheduleOrnamentHide()
+            }
         }
         .sheet(isPresented: $showSettings) {
             SettingsView(estURL: $estURL, pstURL: $pstURL)
@@ -144,6 +197,16 @@ struct ContentView: View {
         }
     }
 
+    private func toggleMute() {
+        if volume > 0 {
+            previousVolume = volume
+            volume = 0
+        } else {
+            volume = previousVolume > 0 ? previousVolume : 1.0
+        }
+        player.volume = Float(volume)
+    }
+
     private func hideIconAfterDelay() {
         Task {
             try? await Task.sleep(nanoseconds: 2_000_000_000)
@@ -151,6 +214,38 @@ struct ContentView: View {
                 showIcon = false
             }
         }
+    }
+
+    private func scheduleOrnamentHide() {
+        ornamentHideTask?.cancel()
+        ornamentHideTask = Task {
+            try? await Task.sleep(nanoseconds: 4_000_000_000)
+            if !isInteractingWithOrnaments {
+                withAnimation {
+                    showOrnaments = false
+                }
+            }
+        }
+    }
+
+    private func showOrnamentsTemporarily() {
+        withAnimation {
+            showOrnaments = true
+        }
+        scheduleOrnamentHide()
+    }
+
+    private func keepOrnamentsVisible() {
+        ornamentHideTask?.cancel()
+        isInteractingWithOrnaments = true
+        withAnimation {
+            showOrnaments = true
+        }
+    }
+
+    private func releaseOrnamentInteraction() {
+        isInteractingWithOrnaments = false
+        scheduleOrnamentHide()
     }
 
     private func switchChannel(to channel: Channel) {
@@ -172,6 +267,7 @@ struct ContentView: View {
         let wasPlaying = isPlaying
         let newItem = AVPlayerItem(url: url)
         player.replaceCurrentItem(with: newItem)
+        player.volume = Float(volume)
 
         if wasPlaying {
             player.play()
