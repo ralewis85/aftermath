@@ -9,6 +9,7 @@ import SwiftUI
 import AVKit
 import AVFoundation
 import CoreMedia
+import UIKit
 
 enum Channel: String, CaseIterable {
     case est = "EST"
@@ -75,10 +76,15 @@ struct ContentView: View {
                 .animation(.easeInOut, value: showIcon)
                 .allowsHitTesting(false)
         }
-        .frame(width: 800, height: 600)
-        .aspectRatio(4.0/3.0, contentMode: .fit)
         .onAppear {
             setupMetadataObservers()
+
+            // Set uniform resizing to maintain aspect ratio
+            guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene else { return }
+            let preferences = UIWindowScene.GeometryPreferences.Vision(
+                resizingRestrictions: .uniform
+            )
+            windowScene.requestGeometryUpdate(preferences)
         }
         .ornament(
             visibility: .visible,
