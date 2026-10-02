@@ -11,38 +11,27 @@ import AVFoundation
 import CoreMedia
 import UIKit
 
-enum Channel: String, CaseIterable {
-    case est = "EST"
-    case pst = "PST"
-
-    func streamURL(estURL: String, pstURL: String) -> URL? {
-        let urlString = self == .est ? estURL : pstURL
-        return URL(string: urlString)
-    }
-}
-
 struct ContentView: View {
     @State private var player: AVPlayer
     @State private var isPlaying: Bool = false
     @State private var showIcon: Bool = true
-    @State private var selectedChannel: Channel = .est
+    @State private var currentStream: IPTVStream?
     @State private var metadata: [String: String] = [:]
     @State private var timedMetadata: String = ""
-    @State private var showSettings: Bool = false
-    @State private var showURLAlert: Bool = false
-    @State private var alertMessage: String = ""
+    @State private var showBrowser: Bool = false
+    @State private var playbackFailed: Bool = false
+    @State private var statusObservation: NSKeyValueObservation?
+    @State private var catalog = StreamCatalog()
+    @State private var favorites = FavoritesStore()
     @State private var volume: Double = 1.0
     @State private var previousVolume: Double = 1.0
     @State private var showOrnaments: Bool = true
     @State private var ornamentHideTask: Task<Void, Never>?
     @State private var isInteractingWithOrnaments: Bool = false
 
-    @AppStorage("estURL") private var estURL: String = ""
-    @AppStorage("pstURL") private var pstURL: String = ""
-
     init() {
         // Create player with a blank item initially
-        // User will need to configure URLs and select a channel
+        // User picks a stream from the browser or a favorite
         let dummyURL = URL(string: "about:blank")!
         let playerItem = AVPlayerItem(url: dummyURL)
         _player = State(initialValue: AVPlayer(playerItem: playerItem))
@@ -72,9 +61,23 @@ struct ContentView: View {
                 .foregroundColor(.white.opacity(0.8))
                 .shadow(radius: 10)
                 .animation(nil, value: isPlaying)
-                .opacity(showIcon ? 1 : 0)
+                .opacity(showIcon && currentStream != nil ? 1 : 0)
                 .animation(.easeInOut, value: showIcon)
                 .allowsHitTesting(false)
+
+            if currentStream == nil {
+                Text("Browse streams")
+                    .font(.title2)
+                    .foregroundColor(.white.opacity(0.7))
+                    .allowsHitTesting(false)
+            } else if playbackFailed {
+                Text("Stream unavailable")
+                    .font(.title2)
+                    .padding(12)
+                    .background(.black.opacity(0.6), in: RoundedRectangle(cornerRadius: 12))
+                    .foregroundColor(.white)
+                    .allowsHitTesting(false)
+            }
         }
         .onAppear {
             setupMetadataObservers()
@@ -120,41 +123,32 @@ struct ContentView: View {
 
                 Spacer(minLength: 200)
 
-                ForEach(Channel.allCases, id: \.self) { channel in
-                    Button(action: {
-                        selectedChannel = channel
-                    }) {
-                        Text(channel.rawValue)
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(selectedChannel == channel ? .white : .white.opacity(0.6))
-                            .frame(width: 60, height: 60)
-                            .background(
-                                Circle()
-                                    .fill(selectedChannel == channel ? Color.blue : Color.gray.opacity(0.3))
-                            )
-                            .overlay(
-                                Circle()
-                                    .stroke(Color.white.opacity(0.2), lineWidth: 1)
-                            )
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(favorites.streams) { stream in
+                            Button(action: { play(stream) }) {
+                                StreamArtwork(stream: stream, size: 60)
+                                    .overlay(
+                                        Circle().stroke(
+                                            currentStream?.id == stream.id ? Color.blue : Color.white.opacity(0.2),
+                                            lineWidth: currentStream?.id == stream.id ? 3 : 1
+                                        )
+                                    )
+                            }
+                            .buttonStyle(.plain)
+                        }
                     }
-                    .buttonStyle(.plain)
+                    .padding(.vertical, 4)
                 }
+                .frame(maxWidth: 420)
 
-                Button(action: {
-                    showSettings = true
-                }) {
-                    Image(systemName: "gearshape.fill")
+                Button(action: { showBrowser = true }) {
+                    Image(systemName: "list.bullet")
                         .font(.system(size: 20, weight: .semibold))
                         .foregroundColor(.white.opacity(0.8))
                         .frame(width: 60, height: 60)
-                        .background(
-                            Circle()
-                                .fill(Color.gray.opacity(0.3))
-                        )
-                        .overlay(
-                            Circle()
-                                .stroke(Color.white.opacity(0.2), lineWidth: 1)
-                        )
+                        .background(Circle().fill(Color.gray.opacity(0.3)))
+                        .overlay(Circle().stroke(Color.white.opacity(0.2), lineWidth: 1))
                 }
                 .buttonStyle(.plain)
             }
@@ -174,19 +168,8 @@ struct ContentView: View {
                 scheduleOrnamentHide()
             }
         }
-        .sheet(isPresented: $showSettings) {
-            SettingsView(estURL: $estURL, pstURL: $pstURL)
-        }
-        .alert("URL Required", isPresented: $showURLAlert) {
-            Button("Open Settings") {
-                showSettings = true
-            }
-            Button("Cancel", role: .cancel) { }
-        } message: {
-            Text(alertMessage)
-        }
-        .onChange(of: selectedChannel) { oldValue, newValue in
-            switchChannel(to: newValue)
+        .sheet(isPresented: $showBrowser) {
+            StreamBrowserView(catalog: catalog, favorites: favorites, onSelect: play)
         }
     }
 
@@ -254,30 +237,22 @@ struct ContentView: View {
         scheduleOrnamentHide()
     }
 
-    private func switchChannel(to channel: Channel) {
-        let channelURL = channel == .est ? estURL : pstURL
+    private func play(_ stream: IPTVStream) {
+        currentStream = stream
+        playbackFailed = false
 
-        // Check if URL is empty or invalid
-        if channelURL.trimmingCharacters(in: .whitespaces).isEmpty {
-            alertMessage = "No URL configured for \(channel.rawValue) channel.\n\nPlease tap the settings icon (⚙️) to configure the stream URL."
-            showURLAlert = true
-            return
+        let newItem = AVPlayerItem(url: stream.url)
+        statusObservation = newItem.observe(\.status, options: [.new]) { item, _ in
+            let failed = item.status == .failed
+            Task { @MainActor in playbackFailed = failed }
         }
 
-        guard let url = channel.streamURL(estURL: estURL, pstURL: pstURL) else {
-            alertMessage = "Invalid URL for \(channel.rawValue) channel.\n\nPlease check the URL in settings and try again."
-            showURLAlert = true
-            return
-        }
-
-        let wasPlaying = isPlaying
-        let newItem = AVPlayerItem(url: url)
         player.replaceCurrentItem(with: newItem)
         player.volume = Float(volume)
-
-        if wasPlaying {
-            player.play()
-        }
+        player.play()
+        isPlaying = true
+        showIcon = true
+        hideIconAfterDelay()
 
         setupMetadataObservers()
     }
@@ -346,42 +321,6 @@ struct ContentView: View {
         }
         metadataOutput.setDelegate(delegate, queue: DispatchQueue.main)
         currentItem.add(metadataOutput)
-    }
-}
-
-struct SettingsView: View {
-    @Binding var estURL: String
-    @Binding var pstURL: String
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section("EST Channel URL") {
-                    TextField("https://example.com/stream.m3u8", text: $estURL)
-                        .textFieldStyle(.roundedBorder)
-                        .autocorrectionDisabled()
-                        .textInputAutocapitalization(.never)
-                }
-
-                Section("PST Channel URL") {
-                    TextField("https://example.com/stream.m3u8", text: $pstURL)
-                        .textFieldStyle(.roundedBorder)
-                        .autocorrectionDisabled()
-                        .textInputAutocapitalization(.never)
-                }
-            }
-            .navigationTitle("Stream Settings")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
-            }
-        }
-        .frame(width: 600, height: 400)
     }
 }
 
