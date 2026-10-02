@@ -8,7 +8,6 @@
 import SwiftUI
 import AVKit
 import AVFoundation
-import CoreMedia
 import UIKit
 
 struct ContentView: View {
@@ -16,8 +15,6 @@ struct ContentView: View {
     @State private var isPlaying: Bool = false
     @State private var showIcon: Bool = true
     @State private var currentStream: IPTVStream?
-    @State private var metadata: [String: String] = [:]
-    @State private var timedMetadata: String = ""
     @State private var showBrowser: Bool = false
     @State private var playbackFailed: Bool = false
     @State private var statusObservation: NSKeyValueObservation?
@@ -80,8 +77,6 @@ struct ContentView: View {
             }
         }
         .onAppear {
-            setupMetadataObservers()
-
             // Set uniform resizing to maintain aspect ratio
             guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene else { return }
             let preferences = UIWindowScene.GeometryPreferences.Vision(
@@ -253,89 +248,6 @@ struct ContentView: View {
         isPlaying = true
         showIcon = true
         hideIconAfterDelay()
-
-        setupMetadataObservers()
-    }
-
-    private func setupMetadataObservers() {
-        guard let currentItem = player.currentItem else { return }
-
-        // Extract basic metadata
-        Task {
-            let commonMetadata = try? await currentItem.asset.load(.commonMetadata)
-            var extractedMetadata: [String: String] = [:]
-
-            for item in commonMetadata ?? [] {
-                if let key = item.commonKey?.rawValue,
-                   let value = try? await item.load(.stringValue) {
-                    extractedMetadata[key] = value
-                }
-            }
-
-            await MainActor.run {
-                self.metadata = extractedMetadata
-            }
-        }
-
-        // Observe timed metadata
-        NotificationCenter.default.addObserver(
-            forName: AVPlayerItem.newAccessLogEntryNotification,
-            object: currentItem,
-            queue: .main
-        ) { _ in
-            // Log access entry updates
-        }
-
-        // Check for timed metadata tracks
-        Task {
-            if let tracks = try? await currentItem.asset.load(.tracks) {
-                for track in tracks {
-                    if let formatDescriptions = try? await track.load(.formatDescriptions) {
-                        for description in formatDescriptions {
-                            let mediaType = CMFormatDescriptionGetMediaType(description)
-                            if mediaType == kCMMediaType_Metadata {
-                                print("Found metadata track")
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Observe metadata output
-        let metadataOutput = AVPlayerItemMetadataOutput()
-        let delegate = MetadataDelegate { items in
-            Task {
-                var metadataStrings: [String] = []
-                for item in items {
-                    if let value = try? await item.load(.value) as? String {
-                        metadataStrings.append(value)
-                    }
-                }
-                if !metadataStrings.isEmpty {
-                    await MainActor.run {
-                        self.timedMetadata = metadataStrings.joined(separator: ", ")
-                    }
-                }
-            }
-        }
-        metadataOutput.setDelegate(delegate, queue: DispatchQueue.main)
-        currentItem.add(metadataOutput)
-    }
-}
-
-class MetadataDelegate: NSObject, AVPlayerItemMetadataOutputPushDelegate {
-    let onMetadata: ([AVMetadataItem]) -> Void
-
-    init(onMetadata: @escaping ([AVMetadataItem]) -> Void) {
-        self.onMetadata = onMetadata
-    }
-
-    func metadataOutput(_ output: AVPlayerItemMetadataOutput, didOutputTimedMetadataGroups groups: [AVTimedMetadataGroup], from track: AVPlayerItemTrack?) {
-        let items = groups.flatMap { $0.items }
-        if !items.isEmpty {
-            onMetadata(items)
-        }
     }
 }
 

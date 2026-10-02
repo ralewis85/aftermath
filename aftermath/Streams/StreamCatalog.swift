@@ -19,16 +19,16 @@ final class StreamCatalog {
     private(set) var categories: [String] = []
     private(set) var countries: [String] = []
 
-    var query = ""
-    var category: String?
-    var country: String?
+    var query = "" { didSet { refilter() } }
+    var category: String? { didSet { refilter() } }
+    var country: String? { didSet { refilter() } }
 
-    var filtered: [IPTVStream] {
-        StreamFilter.apply(streams, query: query, category: category, country: country)
-    }
+    /// Cached so view bodies can read it repeatedly without re-scanning the whole index.
+    private(set) var filtered: [IPTVStream] = []
 
     @ObservationIgnored private let cacheURL: URL
     @ObservationIgnored private let fetch: @Sendable () async throws -> String
+    @ObservationIgnored private var inFlight: Task<Void, Never>?
 
     init(
         cacheURL: URL = URL.cachesDirectory.appending(path: "iptv-index.m3u"),
@@ -38,8 +38,20 @@ final class StreamCatalog {
         self.fetch = fetch
     }
 
+    /// Joins an in-flight download if there is one. The download runs in its own task, so
+    /// cancelling the caller (e.g. dismissing the browser sheet) does not abort it.
     func load() async {
-        guard state != .loading else { return }
+        if let inFlight {
+            await inFlight.value
+            return
+        }
+        let task = Task { await self.performLoad() }
+        inFlight = task
+        await task.value
+        inFlight = nil
+    }
+
+    private func performLoad() async {
         state = .loading
 
         do {
@@ -68,7 +80,12 @@ final class StreamCatalog {
         streams = parsed
         categories = StreamFilter.categories(in: parsed)
         countries = StreamFilter.countries(in: parsed)
+        refilter()
         state = .loaded
+    }
+
+    private func refilter() {
+        filtered = StreamFilter.apply(streams, query: query, category: category, country: country)
     }
 
     nonisolated static func fetchIndex() async throws -> String {

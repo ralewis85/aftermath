@@ -71,6 +71,25 @@ final class StreamCatalogTests: XCTestCase {
         if case .failed = catalog.state {} else { XCTFail("expected failed, got \(catalog.state)") }
     }
 
+    func testCancellingTheCallerDoesNotAbortTheDownload() async {
+        let text = fixture
+        let counter = Counter()
+        let catalog = StreamCatalog(cacheURL: cacheURL, fetch: {
+            _ = await counter.next()
+            try await Task.sleep(nanoseconds: 200_000_000)
+            return text
+        })
+        let first = Task { await catalog.load() }
+        try? await Task.sleep(nanoseconds: 30_000_000)
+        first.cancel()
+        await first.value
+
+        XCTAssertEqual(catalog.state, .loaded, "dismissing the sheet must not fail the download")
+        XCTAssertEqual(catalog.streams.count, 2)
+        let fetches = await counter.next() - 1
+        XCTAssertEqual(fetches, 1)
+    }
+
     func testFailedRefreshKeepsExistingStreams() async {
         let text = fixture
         let counter = Counter()
