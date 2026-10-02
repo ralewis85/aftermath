@@ -133,7 +133,8 @@ struct ContentView: View {
                             .buttonStyle(.plain)
                         }
                     }
-                    .padding(.vertical, 4)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 6)
                 }
                 .frame(maxWidth: 420)
 
