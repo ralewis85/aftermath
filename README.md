@@ -4,32 +4,30 @@
 
 # Aftermath
 
-A minimal 4:3 aspect ratio visionOS streaming app for Apple Vision Pro. Designed with Toonami Aftermath in mind, but works with any HLS streaming source.
+A minimal 4:3 aspect ratio visionOS streaming app for Apple Vision Pro. Browse and watch live streams from the community-maintained [iptv-org](https://github.com/iptv-org/iptv) playlist.
 
-**Note:** This app does not provide stream URLs. Users must find and supply their own m3u8 links.
+**Note:** This app does not host or provide any video. It loads the public iptv-org playlist, which, in their words, "simply contains user-submitted links to publicly available video stream URLs." Many streams are geo-blocked or offline.
 
 ## Features
 
-- **Dual Channel Support** - Switch between two configurable streaming channels (EST/PST)
-- **Persistent Configuration** - Your stream URLs are automatically saved and restored
+- **Stream Browser** - Search the full iptv-org index and filter by category and country
+- **Favorites** - Star streams to pin them to the ornament for one-tap switching
+- **Offline-Tolerant Catalog** - The last downloaded playlist is cached for when the network is unavailable
 - **4:3 Aspect Ratio** - Window perfectly hugs the video content with no wasted space
-- **Ornament Controls** - Channel switcher and settings float outside the video window
+- **Ornament Controls** - Volume, favorites and the stream browser float outside the video window
 
 # Usage
 
 ## First Launch
 
-On first launch, the app starts with empty stream URLs. You'll need to configure them:
-
-1. Tap the **settings icon (⚙️)** in the ornament above the video
-2. Enter your HLS / m3u8 stream URLs for EST and PST channels
-3. Tap **"Done"** to save
-4. Select a channel (EST or PST) to start streaming
+1. Tap the **list icon** in the ornament above the video
+2. Search or filter, then tap a stream to play it
+3. Tap the **star** on any stream to add it to your favorites
 
 ## Controls
 
-- **EST/PST Buttons** - Switch between configured channels
-- **Settings Button (⚙️)** - Configure stream URLs
+- **Favorite Buttons** - Switch between your starred streams
+- **List Button** - Open the stream browser
 - **Tap Video** - Show/hide pause/play control
 - **Pause/Play Icon** - Auto-hides after 2 seconds while playing
 
