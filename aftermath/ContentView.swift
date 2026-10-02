@@ -18,6 +18,8 @@ struct ContentView: View {
     @State private var showBrowser: Bool = false
     @State private var playbackFailed: Bool = false
     @State private var statusObservation: NSKeyValueObservation?
+    @State private var timeControlObservation: NSKeyValueObservation?
+    @State private var watchdog = StallWatchdog()
     @State private var catalog = StreamCatalog()
     @State private var favorites = FavoritesStore()
     @State private var volume: Double = 1.0
@@ -25,6 +27,9 @@ struct ContentView: View {
     @State private var showOrnaments: Bool = true
     @State private var ornamentHideTask: Task<Void, Never>?
     @State private var isInteractingWithOrnaments: Bool = false
+
+    private let lastStream = LastStreamStore()
+    private let startupTimeout: Double = 15
 
     init() {
         // Create player with a blank item initially
@@ -63,10 +68,11 @@ struct ContentView: View {
                 .allowsHitTesting(false)
 
             if currentStream == nil {
-                Text("Browse streams")
-                    .font(.title2)
-                    .foregroundColor(.white.opacity(0.7))
-                    .allowsHitTesting(false)
+                Button(action: { showBrowser = true }) {
+                    Label("Browse streams", systemImage: "list.bullet")
+                        .font(.title2)
+                }
+                .buttonStyle(.bordered)
             } else if playbackFailed {
                 Text("Stream unavailable")
                     .font(.title2)
@@ -77,6 +83,11 @@ struct ContentView: View {
             }
         }
         .onAppear {
+            observePlaybackStart()
+            if currentStream == nil, let last = lastStream.load() {
+                load(last, autoplay: false)
+            }
+
             // Set uniform resizing to maintain aspect ratio
             guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene else { return }
             let preferences = UIWindowScene.GeometryPreferences.Vision(
@@ -170,15 +181,18 @@ struct ContentView: View {
     }
 
     private func togglePlayPause() {
-        isPlaying.toggle()
+        guard currentStream != nil else {
+            showBrowser = true
+            return
+        }
 
         if isPlaying {
-            player.play()
-            showIcon = true
-            hideIconAfterDelay()
-        } else {
             player.pause()
+            isPlaying = false
             showIcon = true
+            watchdog.disarm()
+        } else {
+            startPlayback()
         }
     }
 
@@ -233,9 +247,20 @@ struct ContentView: View {
         scheduleOrnamentHide()
     }
 
+    /// User-initiated selection (browser row or favorite button).
     private func play(_ stream: IPTVStream) {
+        if currentStream?.id == stream.id && !playbackFailed {
+            if !isPlaying { startPlayback() }
+            return
+        }
+        lastStream.save(stream)
+        load(stream, autoplay: true)
+    }
+
+    private func load(_ stream: IPTVStream, autoplay: Bool) {
         currentStream = stream
         playbackFailed = false
+        watchdog.disarm()
 
         let newItem = AVPlayerItem(url: stream.url)
         statusObservation = newItem.observe(\.status, options: [.new]) { item, _ in
@@ -245,10 +270,37 @@ struct ContentView: View {
 
         player.replaceCurrentItem(with: newItem)
         player.volume = Float(volume)
+
+        if autoplay {
+            startPlayback()
+        } else {
+            isPlaying = false
+            showIcon = true
+        }
+    }
+
+    private func startPlayback() {
         player.play()
         isPlaying = true
         showIcon = true
         hideIconAfterDelay()
+        watchdog.arm(after: startupTimeout) {
+            if currentStream != nil && isPlaying { playbackFailed = true }
+        }
+    }
+
+    /// Clears the stall timer and any failure overlay once video is actually playing.
+    private func observePlaybackStart() {
+        guard timeControlObservation == nil else { return }
+        timeControlObservation = player.observe(\.timeControlStatus, options: [.new]) { player, _ in
+            let playing = player.timeControlStatus == .playing
+            Task { @MainActor in
+                if playing {
+                    watchdog.disarm()
+                    playbackFailed = false
+                }
+            }
+        }
     }
 }
 
