@@ -6,7 +6,7 @@
 
 A minimal 4:3 aspect ratio visionOS streaming app for Apple Vision Pro. Browse and watch live streams.
 
-**Note:** This app doesn't host or provide any video. Streams come from the community-maintained [iptv-org](https://github.com/iptv-org/iptv) playlist, and many are offline or geo-blocked.
+**Note:** This app doesn't host or provide any video. Streams come from the community-maintained [iptv-org](https://github.com/iptv-org/iptv) playlist.
 
 ## Features
 
@@ -35,8 +35,9 @@ A minimal 4:3 aspect ratio visionOS streaming app for Apple Vision Pro. Browse a
 
 ## Requirements
 
-- Xcode 15.0 or later
-- Tested on Vision OS 26.2 Beta
+- Xcode 26.1 or later (also builds with Xcode 27.0)
+- visionOS 26.1 or later (Apple Vision Pro or the visionOS Simulator)
+- An internet connection to load the stream list
 
 ## Installation
 
@@ -54,10 +55,6 @@ open aftermath.xcodeproj
 3. Select your target device (Vision Pro or Simulator)
 
 4. Build and run (⌘R)
-
-## Support
-
-If you're interested in more projects like this, consider [leaving a tip](https://ko-fi.com/neovisiondev) ☕
 
 ## License
 
