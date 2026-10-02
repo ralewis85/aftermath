@@ -4,9 +4,9 @@
 
 # Aftermath
 
-A minimal 4:3 aspect ratio visionOS streaming app for Apple Vision Pro. Browse and watch live streams from the community-maintained [iptv-org](https://github.com/iptv-org/iptv) playlist.
+A minimal 4:3 aspect ratio visionOS streaming app for Apple Vision Pro. Browse and watch live streams.
 
-**Note:** This app does not host or provide any video. It loads the public iptv-org playlist, which, in their words, "simply contains user-submitted links to publicly available video stream URLs." Many streams are geo-blocked or offline.
+**Note:** This app doesn't host or provide any video. Streams come from the community-maintained [iptv-org](https://github.com/iptv-org/iptv) playlist, and many are offline or geo-blocked.
 
 ## Features
 
